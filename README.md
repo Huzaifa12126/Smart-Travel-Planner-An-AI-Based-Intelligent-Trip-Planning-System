@@ -103,12 +103,6 @@ AILAB/
 
 ---
 
-## project drive
-
-All source files and assets: [Google Drive](https://drive.google.com/drive/folders/1FOUoPTgflZr9vqoH4sorvGS9wbBHKDdN?usp=sharing)
-
----
-
 ## team
 
 | name | enrollment |
