@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Smart Travel Planner | AI Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root { 
+            --glass: rgba(15, 23, 42, 0.8); 
+            --bg-grad: linear-gradient(135deg, #020617 0%, #1e1b4b 100%); 
+            --accent: #3b82f6;
+        }
+        body { font-family: 'Inter', sans-serif; background: var(--bg-grad); height: 100vh; overflow: hidden; color: #f8fafc; }
+        
+        .sidebar { width: 280px; padding: 20px; background: rgba(0, 0, 0, 0.3); border-right: 1px solid rgba(255,255,255,0.1); display: flex; flex-direction: column; }
+        body, p, h1, h2, h3, h4, h5, h6, label, span {
+            color: #f8fafc !important;}
+        input.form-control, .search-bar {color: #ffffff !important; background-color: rgba(30, 41, 59, 0.8) !important;border: 1px solid rgba(255, 255, 255, 0.2) !important;}
+        input::placeholder {color: rgba(255, 255, 255, 0.5) !important;}
+        .bubble {color: #ffffff !important;display: block !important;opacity: 1 !important;visibility: visible !important;}
+        .bubble.user {background: var(--accent) !important;color: #ffffff !important;}
+        .bubble.bot {background: #1e293b !important;color: #f8fafc !important;border: 1px solid rgba(255, 255, 255, 0.1) !important;}
+        .history-item {color: #cbd5e1 !important;display: inline-block !important;width: 100% !important;}
+        .history-item:hover {color: #ffffff !important;}
+        .new-chat-btn {
+            background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+            color: white; border-radius: 12px; padding: 12px; width: 100%; margin-bottom: 25px;
+            font-weight: 600; transition: 0.3s; text-align: left;
+        }
+        .new-chat-btn:hover { background: var(--accent); border-color: var(--accent); }
+
+        .history-item {
+            background: transparent; border: none; color: #94a3b8; text-align: left;
+            padding: 10px; border-radius: 8px; font-size: 0.85rem; width: 100%;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: 0.2s;
+        }
+        .history-item:hover { background: rgba(255,255,255,0.05); color: white; }
+
+        .chat-main { flex: 1; display: flex; flex-direction: column; background: rgba(15, 23, 42, 0.5); }
+        .chat-header { padding: 15px 30px; border-bottom: 1px solid rgba(255,255,255,0.1); font-weight: 600; font-size: 1.1rem; }
+        
+        #chat-box { flex: 1; padding: 30px; overflow-y: auto; display: flex; flex-direction: column; }
+        
+        .bubble { max-width: 80%; padding: 16px 20px; border-radius: 20px; margin-bottom: 24px; font-size: 1rem; line-height: 1.6; }
+ 
+        .bot { background: #1e293b; color: #f1f5f9 !important; align-self: flex-start;border: 1px solid rgba(255,255,255,0.05); }
+        .user { background: var(--accent); color: white; align-self: flex-end; box-shadow: 0 10px 20px rgba(59,130,246,0.2); }
+
+        .input-area { padding: 30px; max-width: 800px; margin: 0 auto; width: 100%; }
+        .search-bar { 
+            background: #1e293b; border: 1px solid rgba(255,255,255,0.2); 
+            color: white !important; border-radius: 16px; padding: 15px 25px;
+        }
+        .history-container:hover .delete-btn {opacity: 1;}
+        .delete-btn {background: transparent;border: none;color: #ef4444;font-size: 1.2rem;padding: 0 10px;opacity: 0;transition: 0.3s;cursor: pointer;}
+    </style>
+</head>
+<body class="d-flex">
+
+    <div class="sidebar">
+        <button class="new-chat-btn" onclick="startNewChat()">+ New Chat</button>
+        <div class="text-uppercase small fw-bold mb-3 opacity-50" style="letter-spacing: 1px;">Recent Trips</div>
+        <div class="flex-grow-1 overflow-auto">
+    {% for item in history %}
+    <div class="history-container d-flex align-items-center mb-1" id="container-{{ item._id }}">
+        <button class="history-item flex-grow-1" onclick="loadPreviousTrip('{{ item._id }}')">
+            🕒 {{ item.prompt }}
+        </button>
+        <button class="delete-btn" onclick="confirmDelete(event, '{{ item._id }}')">&times;</button>
+    </div>
+    {% endfor %}
+</div>
+        <div class="mt-4 pt-3 border-top border-secondary">
+            <div class="small mb-2">👤 {{ user.username }}</div>
+            <a href="/logout" class="text-danger text-decoration-none small">Log Out</a>
+        </div>
+    </div>
+
+    <div class="chat-main">
+    <div class="chat-header text-info">Smart Travel AI</div>
+    
+ <div id="chat-box">
+    {% if current_chat_messages %}
+        {% for msg in current_chat_messages %}
+            <div class="bubble user">{{ msg.prompt }}</div>
+            
+            <div class="bubble bot">{{ msg.reply | safe }}</div>
+        {% endfor %}
+    {% else %}
+        <div class="bubble bot">Welcome back! 👋 Where are we heading today?</div>
+    {% endif %}
+</div>
+
+        <div class="input-area">
+            <div class="input-group">
+                <input type="text" id="user-input" class="form-control search-bar" placeholder="Enter trip details (e.g., Karachi to Multan by car)" onkeypress="handleEnter(event)">
+                <button class="btn btn-primary px-4 ms-2 rounded-pill" onclick="sendMessage()">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function startNewChat() {
+            await fetch('/new_chat');
+            document.getElementById('chat-box').innerHTML = '<div class="bubble bot">Started a fresh conversation. Where are we heading?</div>';
+            document.getElementById('user-input').value = '';
+        }
+    
+    async function loadPreviousTrip(id) {
+    const box = document.getElementById('chat-box');
+    box.innerHTML = '<div class="bubble bot"><i>Loading your trip details...</i></div>';
+    
+    try {
+        const response = await fetch(`/get_history/${id}`);
+        const data = await response.json();
+        
+        box.innerHTML = ''; 
+        
+        data.messages.forEach(msg => {
+            box.innerHTML += `<div class="bubble user">${msg.prompt}</div>`;
+            box.innerHTML += `<div class="bubble bot">${msg.reply}</div>`;
+        });
+        
+        box.scrollTop = box.scrollHeight;
+    } catch (error) {
+        box.innerHTML = '<div class="bubble bot text-danger">Error loading history.</div>';
+    }
+}
+
+    async function sendMessage() {
+    const input = document.getElementById('user-input');
+    const chatBox = document.getElementById('chat-box');
+    const text = input.value.trim();
+    if (!text) return;
+
+    chatBox.innerHTML += `<div class="bubble user">${text}</div>`;
+    input.value = '';
+
+    const response = await fetch('/chat', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ message: text })
+    });
+    const data = await response.json();
+
+    chatBox.innerHTML += `<div class="bubble bot">${data.reply}</div>`;
+    chatBox.scrollTop = chatBox.scrollHeight;
+
+    const sidebar = document.querySelector('.flex-grow-1.overflow-auto');
+    const existingEntry = document.getElementById(`container-${data.trip_id}`);
+
+    if (!existingEntry) {
+        const newItem = `
+            <div class="history-container d-flex align-items-center mb-1" id="container-${data.trip_id}">
+                <button class="history-item flex-grow-1" onclick="loadPreviousTrip('${data.trip_id}')">
+                    🕒 ${data.title}
+                </button>
+                <button class="delete-btn" onclick="confirmDelete(event, '${data.trip_id}')">&times;</button>
+            </div>`;
+        sidebar.insertAdjacentHTML('afterbegin', newItem);
+    }
+}
+       async function confirmDelete(event, chatId) {
+       event.stopPropagation();
+
+    if (confirm("Are you sure you want to delete this trip from your history?")) {
+        try {
+            const response = await fetch(`/delete_chat/${chatId}`, {
+                method: 'DELETE'
+            });
+            const data = await response.json();
+
+            if (data.status === "success") {
+                const element = document.getElementById(`container-${chatId}`);
+                element.style.opacity = '0';
+                setTimeout(() => element.remove(), 300);
+            } else {
+                alert("Failed to delete chat.");
+            }
+        } catch (error) {
+            console.error("Error:", error);
+        }
+    }
+}
+
+        function handleEnter(e) { if(e.key === 'Enter') sendMessage(); }
+    </script>
+</body>
+</html>
